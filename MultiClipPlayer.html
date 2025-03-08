@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seamless 2×2 Video Grid</title>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fff; color: #000; font-family: sans-serif; }
+
+    /* Controls (now scrollable) */
+    .controls {
+      text-align: center;
+      padding: 15px;
+      background: #f0f0f0;
+      position: relative;
+      z-index: 1000;
+    }
+    .controls select, .controls input, .controls button {
+      margin: 5px;
+      padding: 8px;
+    }
+
+    /* Default 2×2 video grid (expands dynamically) */
+    .video-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      width: 100vw;
+    }
+
+    /* Videos fit exactly in grid (no borders/gaps) */
+    .video-wrapper {
+      position: relative;
+      overflow: hidden;
+      background: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    video, iframe {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.2s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+  <h2 style="text-align: center;">Seamless 2×2 Video Grid</h2>
+
+  <div class="controls">
+    <!-- Bulk Video Selection -->
+    <input type="file" id="bulkFileInput" accept="video/*" multiple onchange="loadMultipleVideos()">
+    <br>
+    
+    <!-- Combined Screen Selection (for both adding videos & zooming) -->
+    <select id="screenSelector">
+      <option value="" disabled selected>Select a Screen</option>
+    </select>
+    
+    <!-- Video Addition -->
+    <input type="file" id="fileInput" accept="video/*" onchange="loadSelectedVideo()">
+    <input type="text" id="urlInput" placeholder="Paste YouTube or MP4 URL">
+    <input type="text" id="startTime" placeholder="Start (mm:ss)">
+    <input type="text" id="endTime" placeholder="End (mm:ss)">
+    <button onclick="loadVideoFromURL()">Load Video</button>
+    <br>
+
+    <!-- Play/Pause & Screen Controls -->
+    <button onclick="playAll()">▶ Play All</button>
+    <button onclick="pauseAll()">⏸ Pause All</button>
+    <button onclick="addScreen()">➕ Add Screen</button>
+    <button onclick="removeScreen()">❌ Remove Screen</button>
+    <br>
+
+    <!-- Zoom Controls -->
+    <button onclick="zoomIn()">🔍 Zoom In</button>
+    <button onclick="zoomOut()">🔎 Zoom Out</button>
+  </div>
+
+  <div class="video-container" id="videoGrid">
+    <div class="video-wrapper"><video controls loop></video></div>
+    <div class="video-wrapper"><video controls loop></video></div>
+    <div class="video-wrapper"><video controls loop></video></div>
+    <div class="video-wrapper"><video controls loop></video></div>
+  </div>
+
+  <script>
+    function updateScreenSelector() {
+      let selector = document.getElementById("screenSelector");
+      selector.innerHTML = "<option value='' disabled selected>Select a Screen</option>";
+      document.querySelectorAll(".video-wrapper").forEach((_, index) => {
+        let option = document.createElement("option");
+        option.value = index;
+        option.textContent = `Screen ${index + 1}`;
+        selector.appendChild(option);
+      });
+    }
+    updateScreenSelector();
+
+    function loadMultipleVideos() {
+      let files = document.getElementById("bulkFileInput").files;
+      let screens = document.querySelectorAll(".video-wrapper video");
+      for (let i = 0; i < files.length && i < screens.length; i++) {
+        screens[i].src = URL.createObjectURL(files[i]);
+      }
+    }
+
+    function loadSelectedVideo() {
+      let file = document.getElementById("fileInput").files[0];
+      let screenIndex = document.getElementById("screenSelector").value;
+      if (file && screenIndex !== "") {
+        document.querySelectorAll(".video-wrapper video")[screenIndex].src = URL.createObjectURL(file);
+      }
+    }
+
+    function loadVideoFromURL() {
+      let url = document.getElementById("urlInput").value;
+      let screenIndex = document.getElementById("screenSelector").value;
+      let startTime = parseTime(document.getElementById("startTime").value);
+      let endTime = parseTime(document.getElementById("endTime").value);
+      
+      if (url && screenIndex !== "") {
+        let screen = document.querySelectorAll(".video-wrapper")[screenIndex];
+        screen.innerHTML = `<iframe width="100%" height="100%" src="${convertYouTubeURL(url, startTime, endTime)}" frameborder="0" allowfullscreen></iframe>`;
+      }
+    }
+
+    function convertYouTubeURL(url, start, end) {
+      let videoId = url.split("/clip/")[1]?.split("?")[0] || url.split("v=")[1]?.split("&")[0];
+      let embedURL = `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&start=${start}`;
+      if (end) embedURL += `&end=${end}`;
+      return embedURL;
+    }
+
+    function parseTime(time) {
+      let parts = time.split(":").map(Number);
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return 0;
+    }
+
+    function playAll() {
+      document.querySelectorAll("video").forEach(video => video.play());
+    }
+
+    function pauseAll() {
+      document.querySelectorAll("video").forEach(video => video.pause());
+    }
+
+    function addScreen() {
+      let videoGrid = document.getElementById("videoGrid");
+      let newWrapper = document.createElement("div");
+      newWrapper.className = "video-wrapper";
+      newWrapper.innerHTML = "<video controls loop></video>";
+      videoGrid.appendChild(newWrapper);
+      updateScreenSelector();
+    }
+
+    function removeScreen() {
+      let videoGrid = document.getElementById("videoGrid");
+      if (videoGrid.children.length > 4) {
+        videoGrid.removeChild(videoGrid.lastElementChild);
+        updateScreenSelector();
+      }
+    }
+
+    function zoomIn() {
+      let screenIndex = document.getElementById("screenSelector").value;
+      if (screenIndex !== "") {
+        let video = document.querySelectorAll(".video-wrapper video, .video-wrapper iframe")[screenIndex];
+        video.style.transform = "scale(2)";
+      }
+    }
+
+    function zoomOut() {
+      let screenIndex = document.getElementById("screenSelector").value;
+      if (screenIndex !== "") {
+        let video = document.querySelectorAll(".video-wrapper video, .video-wrapper iframe")[screenIndex];
+        video.style.transform = "scale(1)";
+      }
+    }
+  </script>
+
+</body>
+</html>
